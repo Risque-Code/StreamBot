@@ -1,6 +1,5 @@
 import { Client, Message } from "discord.js-selfbot-v13";
 import { Streamer, Utils, prepareStream, playStream } from "@dank074/discord-video-stream";
-import fs from 'fs';
 import config from "../config.js";
 import { MediaService } from './media.js';
 import { QueueService } from './queue.js';
@@ -47,23 +46,14 @@ export class StreamingService {
 			const username = message.author.username;
 			const mediaSource = await this.mediaService.resolveMediaSource(videoSource);
 
-			if (mediaSource) {
-				const queueItem = await this.queueService.addToQueue(mediaSource, username);
-				await DiscordUtils.sendSuccess(message, `Added to queue: \`${queueItem.title}\``);
-				return true;
-			} else {
-				// Fallback for unresolved sources
-				const queueItem = await this.queueService.add(
-					videoSource,
-					title || videoSource,
-					username,
-					'url',
-					false,
-					videoSource
-				);
-				await DiscordUtils.sendSuccess(message, `Added to queue: \`${queueItem.title}\``);
-				return true;
+			if (!mediaSource) {
+				await DiscordUtils.sendError(message, 'Only local files are supported.');
+				return false;
 			}
+
+			const queueItem = await this.queueService.addToQueue(mediaSource, username);
+			await DiscordUtils.sendSuccess(message, `Added to queue: \`${queueItem.title}\``);
+			return true;
 		} catch (error) {
 			await ErrorUtils.handleError(error, `adding to queue: ${videoSource}`, message);
 			return false;
@@ -269,49 +259,14 @@ export class StreamingService {
 		}
 	}
 
-	private async handleDownload(message: Message, videoSource: string, title?: string): Promise<string | null> {
-		const downloadMessage = await message.reply(`📥 Downloading \`${title || 'YouTube video'}\`...`).catch(e => {
-			logger.warn("Failed to send 'Downloading...' message:", e);
-			return null;
-		});
-
-		try {
-			logger.info(`Downloading ${title || videoSource}...`);
-			const tempFilePath = await this.mediaService.downloadYouTubeVideo(videoSource);
-
-			if (tempFilePath) {
-				logger.info(`Finished downloading ${title || videoSource}`);
-				if (downloadMessage) {
-					await downloadMessage.delete().catch(e => logger.warn("Failed to delete 'Downloading...' message:", e));
-				}
-				return tempFilePath;
-			}
-			throw new Error('Download failed, no temp file path returned.');
-		} catch (error) {
-			logger.error(`Failed to download YouTube video: ${videoSource}`, error);
-			const errorMessage = `❌ Failed to download \`${title || 'YouTube video'}\`.`;
-			if (downloadMessage) {
-				await downloadMessage.edit(errorMessage).catch(e => logger.warn("Failed to edit 'Downloading...' message:", e));
-			} else {
-				await DiscordUtils.sendError(message, `Failed to download video: ${error instanceof Error ? error.message : String(error)}`);
-			}
-			return null;
-		}
-	}
-
 	private async prepareVideoSource(message: Message, videoSource: string, title?: string): Promise<{ inputForFfmpeg: any, tempFilePath: string | null }> {
 		const mediaSource = await this.mediaService.resolveMediaSource(videoSource);
-
-		if (mediaSource && mediaSource.type === 'youtube' && !mediaSource.isLive) {
-			const tempFilePath = await this.handleDownload(message, videoSource, title);
-			if (tempFilePath) {
-				return { inputForFfmpeg: tempFilePath, tempFilePath };
-			}
-			// Download failed, throw to stop playback
-			throw new Error('Failed to prepare video source due to download failure.');
+		if (!mediaSource || mediaSource.type !== 'local') {
+			await DiscordUtils.sendError(message, `Only local files are supported: ${title || videoSource}`);
+			throw new Error('Unsupported media source');
 		}
 
-		return { inputForFfmpeg: mediaSource ? mediaSource.url : videoSource, tempFilePath: null };
+		return { inputForFfmpeg: mediaSource.url, tempFilePath: null };
 	}
 
 	private async executeStreamWorkflow(input: any, options: any, message: Message, title: string, source: string): Promise<void> {
@@ -329,11 +284,7 @@ export class StreamingService {
 		}
 
 		if (tempFile) {
-			try {
-				fs.unlinkSync(tempFile);
-			} catch (cleanupError) {
-				logger.error(`Failed to delete temp file ${tempFile}:`, cleanupError);
-			}
+			logger.debug(`No temp file cleanup required for local playback: ${tempFile}`);
 		}
 	}
 

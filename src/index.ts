@@ -3,7 +3,6 @@ import config from "./config.js";
 import fs from 'fs';
 import path from 'path';
 import logger from './utils/logger.js';
-import { downloadExecutable, checkForUpdatesAndUpdate } from './utils/yt-dlp.js';
 
 // Import event handlers
 import { handleReady } from './events/client/ready.js';
@@ -12,19 +11,8 @@ import { handleVoiceStateUpdate } from './events/voiceStateUpdate.js';
 
 // Import services
 import { StreamingService } from './services/streaming.js';
-import { MediaService } from './services/media.js';
 import { CommandManager } from './commands/manager.js';
 import { QueueService } from './services/queue.js';
-
-// Download yt-dlp and check for updates
-(async () => {
-	try {
-		await downloadExecutable();
-		await checkForUpdatesAndUpdate();
-	} catch (error) {
-		logger.error("Error during initial yt-dlp setup/update:", error);
-	}
-})();
 
 // Create a new instance of Client
 const client = new Client();
@@ -46,7 +34,6 @@ const streamStatus = {
 
 // Create services
 const streamingService = new StreamingService(client, streamStatus);
-const mediaService = new MediaService();
 const commandManager = new CommandManager();
 
 // Create the videosFolder dir if it doesn't exist
@@ -98,12 +85,6 @@ process.on('uncaughtException', (error) => {
 		return
 	}
 });
-
-// Run server if enabled in config
-if (config.server_enabled) {
-	// Run server.ts
-	import('./server/index.js');
-}
 
 // Login to Discord
 client.login(config.token);
