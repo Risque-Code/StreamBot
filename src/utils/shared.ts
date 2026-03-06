@@ -75,9 +75,7 @@ export const DiscordUtils = {
 	 */
 	async sendList(message: Message, items: string[], type?: string): Promise<void> {
 		await message.react('📋');
-		if (type == "ytsearch") {
-			await message.reply(`📋 **Search Results**:\n${items.join('\n')}`);
-		} else if (type == "refresh") {
+		if (type == "refresh") {
 			await message.reply(`📋 **Video list refreshed**:\n${items.join('\n')}`);
 		} else {
 			await message.channel.send(`📋 **Local Videos List**:\n${items.join('\n')}`);
@@ -121,22 +119,6 @@ export const ErrorUtils = {
  * General utility functions
  */
 export const GeneralUtils = {
-	/**
-	 * Check if input is a valid streaming URL
-	 */
-	isValidUrl(input: string): boolean {
-		if (!input || typeof input !== 'string') {
-			return false;
-		}
-
-		// Check for common streaming platforms
-		return input.includes('youtube.com/') ||
-			   input.includes('youtu.be/') ||
-			   input.includes('twitch.tv/') ||
-			   input.startsWith('http://') ||
-			   input.startsWith('https://');
-	},
-
 	/**
 	 * Check if a path is a local file
 	 */
